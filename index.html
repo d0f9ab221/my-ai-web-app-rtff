@@ -1,0 +1,1528 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CS CHAT - Premium Real-Time Chat</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              500: '#0ea5e9',
+              600: '#0284c7',
+              700: '#0369a1',
+              900: '#0c4a6e',
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Firebase Compat SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  
+<style>
+/* --- CSS: /styles.css --- */
+/* Custom Scrollbar Styles */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.2);
+  border-radius: 9999px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(75, 85, 99, 0.4);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.4);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(75, 85, 99, 0.6);
+}
+
+/* Custom Animations */
+@keyframes scaleUp {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-scale-up {
+  animation: scaleUp 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Custom styling for message bubbles */
+.message-bubble {
+  transition: all 0.2s ease;
+}
+
+.message-bubble:hover .message-actions {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.message-actions {
+  opacity: 0;
+  transform: translateY(4px);
+  transition: all 0.15s ease;
+}
+
+/* Custom styling for active room items */
+.room-item-active {
+  background-color: rgba(14, 165, 233, 0.15);
+  color: #0ea5e9;
+  border-left: 3px solid #0ea5e9;
+}
+
+/* Custom styling for status indicators */
+.status-online {
+  background-color: #10b981;
+}
+
+.status-away {
+  background-color: #f59e0b;
+}
+
+.status-dnd {
+  background-color: #ef4444;
+}
+
+/* Custom styling for emoji picker */
+#emoji-picker {
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+}
+</style></head>
+<body class="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans h-screen overflow-hidden transition-colors duration-200">
+
+  <!-- App Container -->
+  <div id="app" class="h-full flex flex-col">
+    
+    <!-- 1. AUTHENTICATION SCREEN -->
+    <div id="auth-screen" class="flex-1 flex items-center justify-center p-4 bg-gradient-to-br from-slate-900 via-slate-950 to-brand-900">
+      <div class="max-w-md w-full bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 shadow-2xl relative overflow-hidden">
+        <!-- Decorative background glow -->
+        <div class="absolute -top-24 -left-24 w-48 h-48 bg-brand-500/20 rounded-full blur-3xl"></div>
+        <div class="absolute -bottom-24 -right-24 w-48 h-48 bg-purple-500/20 rounded-full blur-3xl"></div>
+
+        <div class="relative z-10 text-center">
+          <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-brand-500/10 border border-brand-500/30 text-brand-500 mb-6 animate-pulse">
+            <i data-lucide="terminal" class="w-8 h-8"></i>
+          </div>
+          <h1 class="text-3xl font-bold tracking-tight text-white mb-2">CS CHAT</h1>
+          <p class="text-slate-400 text-sm mb-8">A premium, real-time developer & tech community chat workspace.</p>
+
+          <!-- Connection Status Badge -->
+          <div id="db-status-badge" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20 mb-6">
+            <span class="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
+            Connecting to Firebase...
+          </div>
+
+          <!-- Auth Buttons -->
+          <div class="space-y-4">
+            <button id="btn-google-login" class="w-full flex items-center justify-center gap-3 bg-white hover:bg-slate-100 text-slate-900 font-semibold py-3 px-4 rounded-xl transition-all duration-200 shadow-lg hover:shadow-white/10">
+              <svg class="w-5 h-5" viewBox="0 0 24 24">
+                <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.53 14.98 1 12 1 7.35 1 3.4 3.65 1.5 7.5l3.86 3c.9-2.7 3.4-4.46 6.64-4.46z"/>
+                <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.29 1.48-1.14 2.73-2.4 3.58l3.73 2.9c2.18-2.01 3.7-4.96 3.7-8.63z"/>
+                <path fill="#FBBC05" d="M5.36 14.5c-.24-.72-.38-1.49-.38-2.3s.14-1.58.38-2.3L1.5 6.9C.54 8.82 0 10.96 0 13.2s.54 4.38 1.5 6.3l3.86-3z"/>
+                <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.73-2.9c-1.1.74-2.52 1.18-4.23 1.18-3.24 0-5.74-1.76-6.64-4.46L1.5 16.9C3.4 20.75 7.35 23 12 23z"/>
+              </svg>
+              Sign in with Google
+            </button>
+
+            <div class="relative my-6">
+              <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-800"></div></div>
+              <span class="relative bg-slate-950 px-3 text-xs text-slate-500 uppercase tracking-wider">Or try instantly</span>
+            </div>
+
+            <button id="btn-demo-login" class="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white font-medium py-3 px-4 rounded-xl transition-all duration-200 border border-slate-700">
+              <i data-lucide="sparkles" class="w-5 h-5 text-brand-400"></i>
+              Enter as Guest (Demo Mode)
+            </button>
+          </div>
+
+          <!-- Info / Credentials Help -->
+          <div class="mt-8 text-left bg-slate-950/50 border border-slate-800/80 rounded-xl p-4 text-xs text-slate-400 space-y-2">
+            <div class="flex items-center gap-1.5 text-brand-400 font-semibold">
+              <i data-lucide="info" class="w-4 h-4"></i>
+              <span>Developer Credentials Configured</span>
+            </div>
+            <p class="font-mono text-[10px] break-all bg-slate-900 p-1.5 rounded border border-slate-800/50">
+              Client ID: 25363042028-i27aanj949h4mn5ga9tq612j2ncgludt.apps.googleusercontent.com
+            </p>
+            <p class="leading-relaxed">
+              If Google Sign-In fails due to sandbox domain restrictions, use the <strong>Guest Mode</strong>. It simulates a fully active real-time chat experience with AI bots!
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. MAIN APP WORKSPACE (Hidden by default) -->
+    <div id="main-workspace" class="hidden flex-1 flex overflow-hidden">
+      
+      <!-- SIDEBAR -->
+      <aside id="sidebar" class="w-72 bg-slate-900 text-slate-300 flex flex-col border-r border-slate-800 shrink-0 transition-all duration-300 md:translate-x-0 -translate-x-full fixed md:static z-30 h-full">
+        <!-- Sidebar Header -->
+        <div class="p-4 border-b border-slate-800 flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-xl bg-brand-500 flex items-center justify-center text-white font-bold shadow-lg shadow-brand-500/20">
+              <i data-lucide="terminal" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h2 class="font-bold text-white tracking-wide text-sm">CS CHAT</h2>
+              <span id="connection-indicator" class="text-[10px] text-emerald-400 flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                Firebase Connected
+              </span>
+            </div>
+          </div>
+          <!-- Close sidebar button (Mobile) -->
+          <button id="btn-close-sidebar" class="md:hidden p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <!-- Search Rooms -->
+        <div class="p-3">
+          <div class="relative">
+            <i data-lucide="search" class="absolute left-3 top-2.5 w-4 h-4 text-slate-500"></i>
+            <input id="room-search" type="text" placeholder="Search channels..." class="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-brand-500 transition-all">
+          </div>
+        </div>
+
+        <!-- Channels / Rooms List -->
+        <div class="flex-1 overflow-y-auto px-2 py-3 space-y-6">
+          <div>
+            <div class="flex items-center justify-between px-2 mb-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              <span>Channels</span>
+              <button id="btn-add-room" class="hover:text-white transition-colors" title="Create Channel">
+                <i data-lucide="plus" class="w-4 h-4"></i>
+              </button>
+            </div>
+            <div id="rooms-list" class="space-y-0.5">
+              <!-- Dynamic Rooms -->
+            </div>
+          </div>
+
+          <!-- Direct Messages (Simulated Active Users) -->
+          <div>
+            <div class="flex items-center justify-between px-2 mb-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              <span>Active Members</span>
+              <span class="bg-brand-500/10 text-brand-400 px-1.5 py-0.5 rounded text-[10px] font-mono" id="active-count">0</span>
+            </div>
+            <div id="members-list-sidebar" class="space-y-0.5">
+              <!-- Dynamic Members -->
+            </div>
+          </div>
+        </div>
+
+        <!-- User Profile Footer -->
+        <div class="p-4 border-t border-slate-800 bg-slate-950/50 flex items-center justify-between">
+          <div class="flex items-center gap-3 overflow-hidden cursor-pointer group" id="btn-edit-profile">
+            <div class="relative shrink-0">
+              <img id="user-avatar" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=80&auto=format&fit=crop&q=60" alt="Avatar" class="w-10 h-10 rounded-xl object-cover border border-slate-700 group-hover:border-brand-500 transition-all">
+              <span id="user-status-dot" class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-slate-900 bg-emerald-500"></span>
+            </div>
+            <div class="overflow-hidden">
+              <h4 id="user-name" class="text-sm font-semibold text-white truncate group-hover:text-brand-400 transition-colors">Developer</h4>
+              <p id="user-status-text" class="text-xs text-slate-400 truncate">Active</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-1">
+            <button id="btn-theme-toggle" class="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white" title="Toggle Theme">
+              <i data-lucide="sun" class="w-4 h-4 hidden dark:block"></i>
+              <i data-lucide="moon" class="w-4 h-4 dark:hidden"></i>
+            </button>
+            <button id="btn-logout" class="p-2 rounded-lg hover:bg-red-500/10 text-slate-400 hover:text-red-400" title="Sign Out">
+              <i data-lucide="log-out" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      <!-- CHAT AREA -->
+      <main class="flex-1 flex flex-col bg-white dark:bg-slate-950 relative overflow-hidden">
+        
+        <!-- Chat Header -->
+        <header class="h-16 border-b border-slate-200 dark:border-slate-800 px-4 flex items-center justify-between shrink-0 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md z-10">
+          <div class="flex items-center gap-3">
+            <!-- Mobile Sidebar Toggle -->
+            <button id="btn-open-sidebar" class="md:hidden p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400">
+              <i data-lucide="menu" class="w-5 h-5"></i>
+            </button>
+            <div>
+              <div class="flex items-center gap-1.5">
+                <span class="text-slate-400 dark:text-slate-500 font-mono text-lg">#</span>
+                <h3 id="active-room-title" class="font-bold text-slate-800 dark:text-white">general</h3>
+              </div>
+              <p id="active-room-desc" class="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">Welcome to the general discussion channel!</p>
+            </div>
+          </div>
+
+          <!-- Header Actions -->
+          <div class="flex items-center gap-2">
+            <!-- Search Messages -->
+            <div class="relative hidden sm:block">
+              <i data-lucide="search" class="absolute left-3 top-2.5 w-4 h-4 text-slate-400"></i>
+              <input id="message-search" type="text" placeholder="Search messages..." class="bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg pl-9 pr-3 py-1.5 text-xs focus:outline-none focus:border-brand-500 transition-all w-48 focus:w-64">
+            </div>
+            <!-- Toggle Right Panel -->
+            <button id="btn-toggle-details" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400" title="Room Details">
+              <i data-lucide="sidebar" class="w-5 h-5"></i>
+            </button>
+          </div>
+        </header>
+
+        <!-- Messages Container -->
+        <div id="messages-container" class="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth">
+          <!-- Dynamic Messages -->
+        </div>
+
+        <!-- Typing Indicator -->
+        <div id="typing-indicator" class="px-6 py-2 text-xs text-slate-500 dark:text-slate-400 italic flex items-center gap-2 hidden">
+          <div class="flex gap-1">
+            <span class="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style="animation-delay: 0ms"></span>
+            <span class="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style="animation-delay: 150ms"></span>
+            <span class="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style="animation-delay: 300ms"></span>
+          </div>
+          <span id="typing-text">Someone is typing...</span>
+        </div>
+
+        <!-- Message Input Area -->
+        <div class="p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950">
+          <form id="message-form" class="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-2 focus-within:border-brand-500 focus-within:ring-1 focus-within:ring-brand-500 transition-all">
+            <!-- Attachment Preview (Hidden by default) -->
+            <div id="attachment-preview" class="hidden flex items-center justify-between bg-slate-100 dark:bg-slate-800 p-2 rounded-lg mb-2">
+              <div class="flex items-center gap-2">
+                <i data-lucide="image" class="w-5 h-5 text-brand-500"></i>
+                <span class="text-xs font-medium truncate max-w-xs" id="attachment-name">image.png</span>
+              </div>
+              <button type="button" id="btn-remove-attachment" class="text-slate-400 hover:text-red-500">
+                <i data-lucide="x" class="w-4 h-4"></i>
+              </button>
+            </div>
+
+            <div class="flex items-end gap-2">
+              <!-- Attachment Button -->
+              <button type="button" id="btn-attach" class="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 shrink-0" title="Attach Image">
+                <i data-lucide="paperclip" class="w-5 h-5"></i>
+              </button>
+              
+              <!-- Textarea -->
+              <textarea id="message-input" rows="1" placeholder="Message #general..." class="flex-1 bg-transparent border-0 resize-none focus:outline-none focus:ring-0 text-sm py-2 max-h-32 min-h-[36px] text-slate-800 dark:text-slate-100" required></textarea>
+              
+              <!-- Emoji Button -->
+              <div class="relative">
+                <button type="button" id="btn-emoji" class="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 shrink-0" title="Add Emoji">
+                  <i data-lucide="smile" class="w-5 h-5"></i>
+                </button>
+                <!-- Emoji Picker Dropdown -->
+                <div id="emoji-picker" class="hidden absolute bottom-12 right-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl p-3 z-50 w-64">
+                  <div class="grid grid-cols-6 gap-2 text-xl text-center" id="emoji-grid">
+                    <!-- Emojis injected here -->
+                  </div>
+                </div>
+              </div>
+
+              <!-- Send Button -->
+              <button type="submit" class="p-2 rounded-lg bg-brand-500 hover:bg-brand-600 text-white shrink-0 transition-colors shadow-md shadow-brand-500/10">
+                <i data-lucide="send" class="w-5 h-5"></i>
+              </button>
+            </div>
+          </form>
+        </div>
+      </main>
+
+      <!-- RIGHT PANEL (Room Details & Members) -->
+      <aside id="right-panel" class="w-80 border-l border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex flex-col shrink-0 hidden lg:flex">
+        <div class="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+          <h3 class="font-bold text-slate-800 dark:text-white text-sm">Channel Details</h3>
+          <button id="btn-close-details" class="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+        
+        <div class="flex-1 overflow-y-auto p-4 space-y-6">
+          <!-- About Channel -->
+          <div>
+            <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">About</h4>
+            <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 space-y-2">
+              <div>
+                <span class="text-[10px] text-slate-400 block">Name</span>
+                <span class="text-sm font-semibold text-slate-800 dark:text-white font-mono" id="detail-room-name">#general</span>
+              </div>
+              <div>
+                <span class="text-[10px] text-slate-400 block">Description</span>
+                <p class="text-xs text-slate-600 dark:text-slate-300" id="detail-room-desc">Welcome to the general discussion channel!</p>
+              </div>
+              <div>
+                <span class="text-[10px] text-slate-400 block">Created By</span>
+                <span class="text-xs text-slate-600 dark:text-slate-300 font-medium" id="detail-room-creator">System</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Active Members in Channel -->
+          <div>
+            <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Members Online</h4>
+            <div id="detail-members-list" class="space-y-2">
+              <!-- Dynamic Members -->
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- 3. MODALS -->
+    
+    <!-- Create Room Modal -->
+    <div id="modal-create-room" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl animate-scale-up">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-bold text-slate-800 dark:text-white">Create a Channel</h3>
+          <button class="btn-close-modal p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-white">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+        <form id="form-create-room" class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Channel Name</label>
+            <div class="relative">
+              <span class="absolute left-3 top-2.5 text-slate-400 font-mono">#</span>
+              <input type="text" id="new-room-name" placeholder="e.g. react-chat" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-8 pr-3 py-2 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500" required>
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Description</label>
+            <textarea id="new-room-desc" placeholder="What is this channel about?" rows="2" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"></textarea>
+          </div>
+          <div class="flex justify-end gap-3 pt-2">
+            <button type="button" class="btn-close-modal px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800">Cancel</button>
+            <button type="submit" class="px-4 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-sm font-medium shadow-lg shadow-brand-500/10">Create Channel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Edit Profile Modal -->
+    <div id="modal-edit-profile" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl animate-scale-up">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-bold text-slate-800 dark:text-white">Edit Profile</h3>
+          <button class="btn-close-modal p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-white">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+        <form id="form-edit-profile" class="space-y-4">
+          <div class="flex flex-col items-center gap-3 mb-4">
+            <div class="relative group">
+              <img id="edit-avatar-preview" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=60" alt="Avatar Preview" class="w-24 h-24 rounded-2xl object-cover border-2 border-brand-500 shadow-lg">
+              <button type="button" id="btn-random-avatar" class="absolute -bottom-2 -right-2 bg-brand-500 hover:bg-brand-600 text-white p-2 rounded-xl shadow-lg transition-all" title="Randomize Avatar">
+                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+              </button>
+            </div>
+            <span class="text-xs text-slate-400">Click the button to generate a random avatar</span>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Display Name</label>
+            <input type="text" id="edit-display-name" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500" required>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Status Message</label>
+            <input type="text" id="edit-status-text" placeholder="What's on your mind?" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Availability</label>
+            <select id="edit-availability" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
+              <option value="online">Active</option>
+              <option value="away">Away</option>
+              <option value="dnd">Do Not Disturb</option>
+            </select>
+          </div>
+          <div class="flex justify-end gap-3 pt-2">
+            <button type="button" class="btn-close-modal px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800">Cancel</button>
+            <button type="submit" class="px-4 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-sm font-medium shadow-lg shadow-brand-500/10">Save Changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Application Scripts -->
+  
+  
+  
+<script type="text/javascript">
+/* --- Script: /data.js --- */
+// Global Data Store
+window.AppData = {
+  // Default channels/rooms
+  defaultRooms: [
+    { id: 'general', name: 'general', desc: 'Welcome to the general discussion channel!', creator: 'System' },
+    { id: 'tech-support', name: 'tech-support', desc: 'Need help with code or hardware? Ask here.', creator: 'System' },
+    { id: 'web-dev', name: 'web-dev', desc: 'All things HTML, CSS, JavaScript, and frameworks.', creator: 'System' },
+    { id: 'random', name: 'random', desc: 'Meme sharing, off-topic banter, and fun stuff.', creator: 'System' },
+    { id: 'announcements', name: 'announcements', desc: 'Official updates and news about CS CHAT.', creator: 'System' }
+  ],
+
+  // Simulated active users for Demo Mode
+  mockUsers: [
+    {
+      id: 'bot-alice',
+      name: 'Alice (AI)',
+      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&auto=format&fit=crop&q=60',
+      status: 'online',
+      statusText: 'Coding in React ⚛️'
+    },
+    {
+      id: 'bot-bob',
+      name: 'Bob (Developer)',
+      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&auto=format&fit=crop&q=60',
+      status: 'online',
+      statusText: 'Debugging production... 🐛'
+    },
+    {
+      id: 'bot-charlie',
+      name: 'Charlie (Designer)',
+      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=80&auto=format&fit=crop&q=60',
+      status: 'away',
+      statusText: 'Designing dark mode 🎨'
+    },
+    {
+      id: 'bot-diana',
+      name: 'Diana (PM)',
+      avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=80&auto=format&fit=crop&q=60',
+      status: 'dnd',
+      statusText: 'In a meeting 📅'
+    }
+  ],
+
+  // Pre-populated messages for Demo Mode
+  mockMessages: [
+    {
+      id: 'msg-1',
+      roomId: 'general',
+      senderId: 'bot-alice',
+      senderName: 'Alice (AI)',
+      senderAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&auto=format&fit=crop&q=60',
+      text: 'Welcome to CS CHAT! This is a premium real-time chat workspace. Feel free to explore and chat with us!',
+      timestamp: Date.now() - 3600000 * 2,
+      reactions: { '👍': 3, '🔥': 2 }
+    },
+    {
+      id: 'msg-2',
+      roomId: 'general',
+      senderId: 'bot-bob',
+      senderName: 'Bob (Developer)',
+      senderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&auto=format&fit=crop&q=60',
+      text: 'Hey everyone! Just finished setting up the Firebase and Google Sign-In integration. It works flawlessly! 🚀',
+      timestamp: Date.now() - 3600000,
+      reactions: { '❤️': 4, '😂': 1 }
+    },
+    {
+      id: 'msg-3',
+      roomId: 'web-dev',
+      senderId: 'bot-charlie',
+      senderName: 'Charlie (Designer)',
+      senderAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=80&auto=format&fit=crop&q=60',
+      text: 'Has anyone tried Tailwind CSS v4 yet? The performance improvements look absolutely insane!',
+      timestamp: Date.now() - 1800000,
+      reactions: { '👍': 2 }
+    }
+  ],
+
+  // List of emojis for the emoji picker
+  emojis: ['😀', '😂', '🤣', '😊', '😍', '🤔', '👍', '👎', '❤️', '🔥', '🎉', '🚀', '👀', '💯', '✨', '💻', '🎨', '🍕']
+};
+
+/* --- Script: /utils.js --- */
+// Web Audio API Synthesizer for Sound Effects
+window.SoundEffects = {
+  ctx: null,
+
+  init() {
+    if (!this.ctx) {
+      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+  },
+
+  playSend() {
+    this.init();
+    if (!this.ctx) return;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(400, this.ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(800, this.ctx.currentTime + 0.1);
+    
+    gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+    
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    
+    osc.start();
+    osc.stop(this.ctx.currentTime + 0.1);
+  },
+
+  playReceive() {
+    this.init();
+    if (!this.ctx) return;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(600, this.ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(300, this.ctx.currentTime + 0.15);
+    
+    gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.15);
+    
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    
+    osc.start();
+    osc.stop(this.ctx.currentTime + 0.15);
+  },
+
+  playClick() {
+    this.init();
+    if (!this.ctx) return;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+    
+    gain.gain.setValueAtTime(0.05, this.ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.05);
+    
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    
+    osc.start();
+    osc.stop(this.ctx.currentTime + 0.05);
+  }
+};
+
+// Firebase & LocalStorage Manager
+window.FirebaseManager = {
+  db: null,
+  auth: null,
+  isFirebaseReady: false,
+
+  init(config, onStatusChange) {
+    try {
+      // Initialize Firebase Compat
+      firebase.initializeApp(config);
+      this.db = firebase.firestore();
+      this.auth = firebase.auth();
+      this.isFirebaseReady = true;
+      console.log("Firebase initialized successfully.");
+      if (onStatusChange) onStatusChange(true);
+    } catch (error) {
+      console.warn("Firebase initialization failed. Falling back to LocalStorage Demo Mode.", error);
+      this.isFirebaseReady = false;
+      if (onStatusChange) onStatusChange(false);
+    }
+  },
+
+  // Auth Methods
+  signInWithGoogle() {
+    if (!this.isFirebaseReady) {
+      throw new Error("Firebase is not initialized. Please use Demo Mode.");
+    }
+    const provider = new firebase.auth.GoogleAuthProvider();
+    return this.auth.signInWithPopup(provider);
+  },
+
+  signOut() {
+    if (this.isFirebaseReady) {
+      return this.auth.signOut();
+    }
+    return Promise.resolve();
+  },
+
+  // Firestore / LocalStorage Methods for Rooms
+  getRooms(callback) {
+    if (this.isFirebaseReady) {
+      this.db.collection('rooms').onSnapshot(snapshot => {
+        const rooms = [];
+        snapshot.forEach(doc => {
+          rooms.push({ id: doc.id, ...doc.data() });
+        });
+        if (rooms.length === 0) {
+          // Seed default rooms if empty
+          window.AppData.defaultRooms.forEach(room => {
+            this.db.collection('rooms').doc(room.id).set(room);
+          });
+        } else {
+          callback(rooms);
+        }
+      }, error => {
+        console.error("Firestore rooms error, falling back to local:", error);
+        callback(this.getLocalRooms());
+      });
+    } else {
+      callback(this.getLocalRooms());
+    }
+  },
+
+  getLocalRooms() {
+    let rooms = localStorage.getItem('cs_chat_rooms');
+    if (!rooms) {
+      rooms = JSON.stringify(window.AppData.defaultRooms);
+      localStorage.setItem('cs_chat_rooms', rooms);
+    }
+    return JSON.parse(rooms);
+  },
+
+  createRoom(room) {
+    if (this.isFirebaseReady) {
+      return this.db.collection('rooms').doc(room.id).set(room);
+    } else {
+      const rooms = this.getLocalRooms();
+      rooms.push(room);
+      localStorage.setItem('cs_chat_rooms', JSON.stringify(rooms));
+      return Promise.resolve(room);
+    }
+  },
+
+  // Firestore / LocalStorage Methods for Messages
+  getMessages(roomId, callback) {
+    if (this.isFirebaseReady) {
+      return this.db.collection('messages')
+        .where('roomId', '==', roomId)
+        .orderBy('timestamp', 'asc')
+        .onSnapshot(snapshot => {
+          const messages = [];
+          snapshot.forEach(doc => {
+            messages.push({ id: doc.id, ...doc.data() });
+          });
+          callback(messages);
+        }, error => {
+          console.error("Firestore messages error, falling back to local:", error);
+          callback(this.getLocalMessages(roomId));
+        });
+    } else {
+      callback(this.getLocalMessages(roomId));
+      // Return a dummy unsubscribe function
+      return () => {};
+    }
+  },
+
+  getLocalMessages(roomId) {
+    let messages = localStorage.getItem('cs_chat_messages');
+    if (!messages) {
+      messages = JSON.stringify(window.AppData.mockMessages);
+      localStorage.setItem('cs_chat_messages', messages);
+    }
+    const allMessages = JSON.parse(messages);
+    return allMessages.filter(m => m.roomId === roomId);
+  },
+
+  sendMessage(msg) {
+    if (this.isFirebaseReady) {
+      return this.db.collection('messages').add(msg);
+    } else {
+      let messages = localStorage.getItem('cs_chat_messages');
+      if (!messages) {
+        messages = JSON.stringify(window.AppData.mockMessages);
+      }
+      const allMessages = JSON.parse(messages);
+      allMessages.push(msg);
+      localStorage.setItem('cs_chat_messages', JSON.stringify(allMessages));
+      return Promise.resolve(msg);
+    }
+  },
+
+  deleteMessage(messageId) {
+    if (this.isFirebaseReady) {
+      return this.db.collection('messages').doc(messageId).delete();
+    } else {
+      let messages = localStorage.getItem('cs_chat_messages');
+      if (messages) {
+        const allMessages = JSON.parse(messages);
+        const filtered = allMessages.filter(m => m.id !== messageId);
+        localStorage.setItem('cs_chat_messages', JSON.stringify(filtered));
+      }
+      return Promise.resolve();
+    }
+  },
+
+  updateMessageReactions(messageId, reactions) {
+    if (this.isFirebaseReady) {
+      return this.db.collection('messages').doc(messageId).update({ reactions });
+    } else {
+      let messages = localStorage.getItem('cs_chat_messages');
+      if (messages) {
+        const allMessages = JSON.parse(messages);
+        const msg = allMessages.find(m => m.id === messageId);
+        if (msg) {
+          msg.reactions = reactions;
+          localStorage.setItem('cs_chat_messages', JSON.stringify(allMessages));
+        }
+      }
+      return Promise.resolve();
+    }
+  }
+};
+
+/* --- Script: /app.js --- */
+// Firebase Configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyD2WobXmsXa6vFnkTW-qmU3ja01x-Yd40M",
+  authDomain: "gen-lang-client-0774401698.firebaseapp.com",
+  projectId: "gen-lang-client-0774401698",
+  storageBucket: "gen-lang-client-0774401698.firebasestorage.app",
+  messagingSenderId: "25363042028",
+  appId: "1:25363042028:web:3e9abd6b32f681c9d29fc9"
+};
+
+// Application State
+const state = {
+  currentUser: null,
+  activeRoom: 'general',
+  rooms: [],
+  messages: [],
+  members: [],
+  isDemoMode: false,
+  theme: 'dark',
+  messageUnsubscribe: null,
+  attachmentUrl: null,
+  attachmentName: null
+};
+
+// DOM Elements
+const elements = {
+  authScreen: document.getElementById('auth-screen'),
+  mainWorkspace: document.getElementById('main-workspace'),
+  dbStatusBadge: document.getElementById('db-status-badge'),
+  btnGoogleLogin: document.getElementById('btn-google-login'),
+  btnDemoLogin: document.getElementById('btn-demo-login'),
+  connectionIndicator: document.getElementById('connection-indicator'),
+  roomsList: document.getElementById('rooms-list'),
+  membersListSidebar: document.getElementById('members-list-sidebar'),
+  activeRoomTitle: document.getElementById('active-room-title'),
+  activeRoomDesc: document.getElementById('active-room-desc'),
+  messagesContainer: document.getElementById('messages-container'),
+  messageForm: document.getElementById('message-form'),
+  messageInput: document.getElementById('message-input'),
+  btnThemeToggle: document.getElementById('btn-theme-toggle'),
+  btnLogout: document.getElementById('btn-logout'),
+  btnEditProfile: document.getElementById('btn-edit-profile'),
+  userName: document.getElementById('user-name'),
+  userAvatar: document.getElementById('user-avatar'),
+  userStatusDot: document.getElementById('user-status-dot'),
+  userStatusText: document.getElementById('user-status-text'),
+  btnOpenSidebar: document.getElementById('btn-open-sidebar'),
+  btnCloseSidebar: document.getElementById('btn-close-sidebar'),
+  sidebar: document.getElementById('sidebar'),
+  btnToggleDetails: document.getElementById('btn-toggle-details'),
+  btnCloseDetails: document.getElementById('btn-close-details'),
+  rightPanel: document.getElementById('right-panel'),
+  detailRoomName: document.getElementById('detail-room-name'),
+  detailRoomDesc: document.getElementById('detail-room-desc'),
+  detailRoomCreator: document.getElementById('detail-room-creator'),
+  detailMembersList: document.getElementById('detail-members-list'),
+  activeCount: document.getElementById('active-count'),
+  roomSearch: document.getElementById('room-search'),
+  messageSearch: document.getElementById('message-search'),
+  typingIndicator: document.getElementById('typing-indicator'),
+  typingText: document.getElementById('typing-text'),
+  btnAttach: document.getElementById('btn-attach'),
+  attachmentPreview: document.getElementById('attachment-preview'),
+  attachmentNameEl: document.getElementById('attachment-name'),
+  btnRemoveAttachment: document.getElementById('btn-remove-attachment'),
+  btnEmoji: document.getElementById('btn-emoji'),
+  emojiPicker: document.getElementById('emoji-picker'),
+  emojiGrid: document.getElementById('emoji-grid'),
+  btnAddRoom: document.getElementById('btn-add-room'),
+  modalCreateRoom: document.getElementById('modal-create-room'),
+  formCreateRoom: document.getElementById('form-create-room'),
+  newRoomName: document.getElementById('new-room-name'),
+  newRoomDesc: document.getElementById('new-room-desc'),
+  modalEditProfile: document.getElementById('modal-edit-profile'),
+  formEditProfile: document.getElementById('form-edit-profile'),
+  editAvatarPreview: document.getElementById('edit-avatar-preview'),
+  btnRandomAvatar: document.getElementById('btn-random-avatar'),
+  editDisplayName: document.getElementById('edit-display-name'),
+  editStatusText: document.getElementById('edit-status-text'),
+  editAvailability: document.getElementById('edit-availability')
+};
+
+// Initialize Application
+function initApp() {
+  // Initialize Firebase
+  window.FirebaseManager.init(firebaseConfig, (success) => {
+    if (success) {
+      elements.dbStatusBadge.innerHTML = `
+        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+        Firebase Connected
+      `;
+      elements.dbStatusBadge.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-6";
+      elements.connectionIndicator.innerHTML = `
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+        Firebase Connected
+      `;
+      elements.connectionIndicator.className = "text-[10px] text-emerald-400 flex items-center gap-1";
+    } else {
+      elements.dbStatusBadge.innerHTML = `
+        <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+        Demo Mode Fallback
+      `;
+      elements.dbStatusBadge.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20 mb-6";
+      elements.connectionIndicator.innerHTML = `
+        <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+        Demo Mode Active
+      `;
+      elements.connectionIndicator.className = "text-[10px] text-amber-400 flex items-center gap-1";
+    }
+  });
+
+  // Setup Auth Listener if Firebase is active
+  if (window.FirebaseManager.isFirebaseReady) {
+    window.FirebaseManager.auth.onAuthStateChanged(user => {
+      if (user) {
+        state.currentUser = {
+          id: user.uid,
+          name: user.displayName || 'Developer',
+          avatar: user.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=80&auto=format&fit=crop&q=60',
+          status: 'online',
+          statusText: 'Active'
+        };
+        state.isDemoMode = false;
+        enterWorkspace();
+      } else {
+        exitWorkspace();
+      }
+    });
+  }
+
+  // Setup Theme
+  if (localStorage.getItem('theme') === 'light') {
+    document.documentElement.classList.remove('dark');
+    state.theme = 'light';
+  } else {
+    document.documentElement.classList.add('dark');
+    state.theme = 'dark';
+  }
+
+  setupEventListeners();
+  renderEmojiPicker();
+  lucide.createIcons();
+}
+
+// Setup Event Listeners
+function setupEventListeners() {
+  // Auth Buttons
+  elements.btnGoogleLogin.addEventListener('click', () => {
+    window.SoundEffects.playClick();
+    if (window.FirebaseManager.isFirebaseReady) {
+      window.FirebaseManager.signInWithGoogle().catch(err => {
+        console.error("Google Sign-In failed:", err);
+        alert("Google Sign-In failed. This is common in sandboxed environments. Please use 'Enter as Guest (Demo Mode)' to test the app instantly!");
+      });
+    } else {
+      alert("Firebase is not connected. Please use 'Enter as Guest (Demo Mode)'!");
+    }
+  });
+
+  elements.btnDemoLogin.addEventListener('click', () => {
+    window.SoundEffects.playClick();
+    state.currentUser = {
+      id: 'guest-' + Math.random().toString(36).substr(2, 9),
+      name: 'Guest Developer',
+      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=80&auto=format&fit=crop&q=60',
+      status: 'online',
+      statusText: 'Exploring CS CHAT 🚀'
+    };
+    state.isDemoMode = true;
+    enterWorkspace();
+  });
+
+  elements.btnLogout.addEventListener('click', () => {
+    window.SoundEffects.playClick();
+    if (state.isDemoMode) {
+      exitWorkspace();
+    } else {
+      window.FirebaseManager.signOut();
+    }
+  });
+
+  // Theme Toggle
+  elements.btnThemeToggle.addEventListener('click', () => {
+    window.SoundEffects.playClick();
+    if (state.theme === 'dark') {
+      document.documentElement.classList.remove('dark');
+      state.theme = 'light';
+      localStorage.setItem('theme', 'light');
+    } else {
+      document.documentElement.classList.add('dark');
+      state.theme = 'dark';
+      localStorage.setItem('theme', 'dark');
+    }
+  });
+
+  // Sidebar Toggle (Mobile)
+  elements.btnOpenSidebar.addEventListener('click', () => {
+    elements.sidebar.classList.remove('-translate-x-full');
+  });
+  elements.btnCloseSidebar.addEventListener('click', () => {
+    elements.sidebar.classList.add('-translate-x-full');
+  });
+
+  // Right Panel Toggle
+  elements.btnToggleDetails.addEventListener('click', () => {
+    elements.rightPanel.classList.toggle('hidden');
+  });
+  elements.btnCloseDetails.addEventListener('click', () => {
+    elements.rightPanel.classList.add('hidden');
+  });
+
+  // Message Form Submit
+  elements.messageForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    sendMessage();
+  });
+
+  // Message Input Keypress (Enter to send, Shift+Enter for newline)
+  elements.messageInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  // Search Channels
+  elements.roomSearch.addEventListener('input', (e) => {
+    renderRooms(e.target.value);
+  });
+
+  // Search Messages
+  elements.messageSearch.addEventListener('input', (e) => {
+    renderMessages(e.target.value);
+  });
+
+  // Create Room Modal
+  elements.btnAddRoom.addEventListener('click', () => {
+    window.SoundEffects.playClick();
+    elements.modalCreateRoom.classList.remove('hidden');
+  });
+
+  document.querySelectorAll('.btn-close-modal').forEach(btn => {
+    btn.addEventListener('click', () => {
+      elements.modalCreateRoom.classList.add('hidden');
+      elements.modalEditProfile.classList.add('hidden');
+    });
+  });
+
+  elements.formCreateRoom.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = elements.newRoomName.value.trim().toLowerCase().replace(/\s+/g, '-');
+    const desc = elements.newRoomDesc.value.trim();
+    if (name) {
+      const newRoom = {
+        id: name,
+        name: name,
+        desc: desc || 'No description provided.',
+        creator: state.currentUser.name
+      };
+      window.FirebaseManager.createRoom(newRoom).then(() => {
+        elements.modalCreateRoom.classList.add('hidden');
+        elements.formCreateRoom.reset();
+        switchRoom(name);
+        loadRooms();
+      });
+    }
+  });
+
+  // Edit Profile Modal
+  elements.btnEditProfile.addEventListener('click', () => {
+    window.SoundEffects.playClick();
+    elements.editDisplayName.value = state.currentUser.name;
+    elements.editStatusText.value = state.currentUser.statusText || '';
+    elements.editAvailability.value = state.currentUser.status;
+    elements.editAvatarPreview.src = state.currentUser.avatar;
+    elements.modalEditProfile.classList.remove('hidden');
+  });
+
+  elements.btnRandomAvatar.addEventListener('click', () => {
+    window.SoundEffects.playClick();
+    const randomId = Math.floor(Math.random() * 1000);
+    const newAvatar = `https://picsum.photos/id/${randomId}/150/150`;
+    elements.editAvatarPreview.src = newAvatar;
+  });
+
+  elements.formEditProfile.addEventListener('submit', (e) => {
+    e.preventDefault();
+    state.currentUser.name = elements.editDisplayName.value.trim();
+    state.currentUser.statusText = elements.editStatusText.value.trim();
+    state.currentUser.status = elements.editAvailability.value;
+    state.currentUser.avatar = elements.editAvatarPreview.src;
+
+    updateProfileUI();
+    elements.modalEditProfile.classList.add('hidden');
+    
+    // If in Demo Mode, simulate active users updating too
+    if (state.isDemoMode) {
+      triggerBotResponse("System", `User **${state.currentUser.name}** updated their profile!`);
+    }
+  });
+
+  // Attachment Simulation
+  elements.btnAttach.addEventListener('click', () => {
+    window.SoundEffects.playClick();
+    // Simulate choosing an image
+    const images = [
+      'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=600&auto=format&fit=crop&q=60',
+      'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=600&auto=format&fit=crop&q=60',
+      'https://images.unsplash.com/photo-1542831371-29b0f74f9713?w=600&auto=format&fit=crop&q=60'
+    ];
+    const randomImg = images[Math.floor(Math.random() * images.length)];
+    state.attachmentUrl = randomImg;
+    state.attachmentName = "attached_code_snippet.png";
+    
+    elements.attachmentNameEl.textContent = state.attachmentName;
+    elements.attachmentPreview.classList.remove('hidden');
+  });
+
+  elements.btnRemoveAttachment.addEventListener('click', () => {
+    state.attachmentUrl = null;
+    state.attachmentName = null;
+    elements.attachmentPreview.classList.add('hidden');
+  });
+
+  // Emoji Picker Toggle
+  elements.btnEmoji.addEventListener('click', (e) => {
+    e.stopPropagation();
+    elements.emojiPicker.classList.toggle('hidden');
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!elements.emojiPicker.contains(e.target) && e.target !== elements.btnEmoji) {
+      elements.emojiPicker.classList.add('hidden');
+    }
+  });
+}
+
+// Enter Workspace
+function enterWorkspace() {
+  elements.authScreen.classList.add('hidden');
+  elements.mainWorkspace.classList.remove('hidden');
+  
+  updateProfileUI();
+  loadRooms();
+  loadMembers();
+  switchRoom(state.activeRoom);
+
+  // Start active user simulation if in Demo Mode
+  if (state.isDemoMode) {
+    startDemoSimulation();
+  }
+}
+
+// Exit Workspace
+function exitWorkspace() {
+  elements.authScreen.classList.remove('hidden');
+  elements.mainWorkspace.classList.add('hidden');
+  state.currentUser = null;
+  if (state.messageUnsubscribe) {
+    state.messageUnsubscribe();
+  }
+}
+
+// Update Profile UI
+function updateProfileUI() {
+  elements.userName.textContent = state.currentUser.name;
+  elements.userAvatar.src = state.currentUser.avatar;
+  elements.userStatusText.textContent = state.currentUser.statusText || 'Active';
+  
+  // Status dot color
+  elements.userStatusDot.className = `absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-slate-900 status-${state.currentUser.status}`;
+}
+
+// Load Rooms
+function loadRooms() {
+  window.FirebaseManager.getRooms(rooms => {
+    state.rooms = rooms;
+    renderRooms();
+  });
+}
+
+// Render Rooms
+function renderRooms(filter = '') {
+  elements.roomsList.innerHTML = '';
+  const filtered = state.rooms.filter(r => r.name.toLowerCase().includes(filter.toLowerCase()));
+  
+  filtered.forEach(room => {
+    const isActive = room.id === state.activeRoom;
+    const div = document.createElement('div');
+    div.className = `flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition-all ${isActive ? 'room-item-active font-semibold' : 'hover:bg-slate-800/50 text-slate-400 hover:text-slate-200'}`;
+    div.innerHTML = `
+      <div class="flex items-center gap-2 overflow-hidden">
+        <span class="font-mono text-slate-500">#</span>
+        <span class="truncate text-sm">${room.name}</span>
+      </div>
+    `;
+    div.addEventListener('click', () => {
+      window.SoundEffects.playClick();
+      switchRoom(room.id);
+    });
+    elements.roomsList.appendChild(div);
+  });
+}
+
+// Switch Room
+function switchRoom(roomId) {
+  state.activeRoom = roomId;
+  const room = state.rooms.find(r => r.id === roomId) || window.AppData.defaultRooms.find(r => r.id === roomId);
+  
+  if (room) {
+    elements.activeRoomTitle.textContent = room.name;
+    elements.activeRoomDesc.textContent = room.desc;
+    elements.detailRoomName.textContent = `#${room.name}`;
+    elements.detailRoomDesc.textContent = room.desc;
+    elements.detailRoomCreator.textContent = room.creator || 'System';
+  }
+
+  // Update active class in sidebar
+  renderRooms();
+
+  // Unsubscribe from previous room messages
+  if (state.messageUnsubscribe) {
+    state.messageUnsubscribe();
+  }
+
+  // Subscribe to new room messages
+  state.messageUnsubscribe = window.FirebaseManager.getMessages(roomId, messages => {
+    state.messages = messages;
+    renderMessages();
+    // Play receive sound if the last message is from someone else
+    if (messages.length > 0) {
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg.senderId !== state.currentUser.id) {
+        window.SoundEffects.playReceive();
+      }
+    }
+  });
+
+  // Close sidebar on mobile after switching room
+  elements.sidebar.classList.add('-translate-x-full');
+}
+
+// Render Messages
+function renderMessages(filter = '') {
+  elements.messagesContainer.innerHTML = '';
+  const filtered = state.messages.filter(m => m.text.toLowerCase().includes(filter.toLowerCase()));
+
+  if (filtered.length === 0) {
+    elements.messagesContainer.innerHTML = `
+      <div class="flex flex-col items-center justify-center h-full text-slate-400 dark:text-slate-600 py-12">
+        <i data-lucide="message-square-dashed" class="w-12 h-12 mb-2"></i>
+        <p class="text-sm">No messages yet. Start the conversation!</p>
+      </div>
+    `;
+    lucide.createIcons();
+    return;
+  }
+
+  filtered.forEach(msg => {
+    const isOwnMessage = msg.senderId === state.currentUser.id;
+    const dateStr = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `flex gap-3 group relative message-bubble p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-all ${isOwnMessage ? 'flex-row-reverse' : ''}`;
+    
+    // Build reactions HTML
+    let reactionsHtml = '';
+    if (msg.reactions && Object.keys(msg.reactions).length > 0) {
+      reactionsHtml = `<div class="flex flex-wrap gap-1 mt-1.5">`;
+      for (const [emoji, count] of Object.entries(msg.reactions)) {
+        if (count > 0) {
+          reactionsHtml += `
+            <button class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs hover:bg-brand-500/10 hover:border-brand-500/30 transition-all" onclick="reactToMessage('${msg.id}', '${emoji}')">
+              <span>${emoji}</span>
+              <span class="text-[10px] font-semibold text-slate-500 dark:text-slate-400">${count}</span>
+            </button>
+          `;
+        }
+      }
+      reactionsHtml += `</div>`;
+    }
+
+    // Attachment HTML
+    const attachmentHtml = msg.attachmentUrl ? `
+      <div class="mt-2 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800 max-w-sm">
+        <img src="${msg.attachmentUrl}" alt="Attachment" class="w-full h-auto max-h-60 object-cover cursor-pointer hover:opacity-90 transition-opacity" onclick="window.open('${msg.attachmentUrl}', '_blank')">
+      </div>
+    ` : '';
+
+    msgDiv.innerHTML = `
+      <img src="${msg.senderAvatar}" alt="Avatar" class="w-10 h-10 rounded-xl object-cover border border-slate-200 dark:border-slate-800 shrink-0">
+      <div class="flex-1 min-w-0 ${isOwnMessage ? 'text-right' : ''}">
+        <div class="flex items-center gap-2 mb-1 ${isOwnMessage ? 'justify-end' : ''}">
+          <span class="font-semibold text-sm text-slate-800 dark:text-slate-200">${msg.senderName}</span>
+          <span class="text-[10px] text-slate-400">${dateStr}</span>
+        </div>
+        <div class="inline-block text-sm text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-900/80 border border-slate-200/50 dark:border-slate-800/50 rounded-2xl px-4 py-2 max-w-xl break-words text-left">
+          ${msg.text}
+          ${attachmentHtml}
+        </div>
+        ${reactionsHtml}
+      </div>
+
+      <!-- Hover Action Bar -->
+      <div class="absolute right-2 top-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-lg px-2 py-1 flex items-center gap-1.5 message-actions z-10">
+        <button class="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-400 hover:text-brand-500 transition-colors" onclick="reactToMessage('${msg.id}', '👍')" title="Like">👍</button>
+        <button class="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-400 hover:text-brand-500 transition-colors" onclick="reactToMessage('${msg.id}', '❤️')" title="Love">❤️</button>
+        <button class="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-400 hover:text-brand-500 transition-colors" onclick="reactToMessage('${msg.id}', '🔥')" title="Fire">🔥</button>
+        ${isOwnMessage ? `
+          <button class="p-1 hover:bg-red-500/10 rounded text-slate-400 hover:text-red-500 transition-colors" onclick="deleteMessage('${msg.id}')" title="Delete">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+          </button>
+        ` : ''}
+      </div>
+    `;
+    elements.messagesContainer.appendChild(msgDiv);
+  });
+
+  // Auto Scroll to Bottom
+  elements.messagesContainer.scrollTop = elements.messagesContainer.scrollHeight;
+  lucide.createIcons();
+}
+
+// Send Message
+function sendMessage() {
+  const text = elements.messageInput.value.trim();
+  if (!text && !state.attachmentUrl) return;
+
+  const newMsg = {
+    id: 'msg-' + Math.random().toString(36).substr(2, 9),
+    roomId: state.activeRoom,
+    senderId: state.currentUser.id,
+    senderName: state.currentUser.name,
+    senderAvatar: state.currentUser.avatar,
+    text: text,
+    attachmentUrl: state.attachmentUrl,
+    timestamp: Date.now(),
+    reactions: {}
+  };
+
+  window.FirebaseManager.sendMessage(newMsg).then(() => {
+    window.SoundEffects.playSend();
+    elements.messageInput.value = '';
+    // Reset attachment
+    state.attachmentUrl = null;
+    state.attachmentName = null;
+    elements.attachmentPreview.classList.add('hidden');
+    
+    // Trigger simulated bot response in Demo Mode
+    if (state.isDemoMode) {
+      simulateBotResponse(text);
+    }
+  });
+}
+
+// Delete Message
+window.deleteMessage = function(messageId) {
+  window.SoundEffects.playClick();
+  window.FirebaseManager.deleteMessage(messageId).then(() => {
+    // Refresh local list if offline
+    if (!window.FirebaseManager.isFirebaseReady) {
+      switchRoom(state.activeRoom);
+    }
+  });
+};
+
+// React to Message
+window.reactToMessage = function(messageId, emoji) {
+  window.SoundEffects.playClick();
+  const msg = state.messages.find(m => m.id === messageId);
+  if (msg) {
+    const reactions = msg.reactions || {};
+    reactions[emoji] = (reactions[emoji] || 0) + 1;
+    window.FirebaseManager.updateMessageReactions(messageId, reactions).then(() => {
+      if (!window.FirebaseManager.isFirebaseReady) {
+        switchRoom(state.activeRoom);
+      }
+    });
+  }
+};
+
+// Load Members
+function loadMembers() {
+  state.members = [...window.AppData.mockUsers];
+  renderMembers();
+}
+
+// Render Members
+function renderMembers() {
+  elements.membersListSidebar.innerHTML = '';
+  elements.detailMembersList.innerHTML = '';
+  
+  // Add current user to active list
+  const allActive = [
+    {
+      id: state.currentUser.id,
+      name: `${state.currentUser.name} (You)`,
+      avatar: state.currentUser.avatar,
+      status: state.currentUser.status,
+      statusText: state.currentUser.statusText || 'Active'
+    },
+    ...state.members
+  ];
+
+  elements.activeCount.textContent = allActive.filter(m => m.status === 'online').length;
+
+  allActive.forEach(member => {
+    // Sidebar list
+    const sidebarDiv = document.createElement('div');
+    sidebarDiv.className = "flex items-center gap-2.5 px-3 py-1.5 rounded-lg hover:bg-slate-800/30 cursor-pointer transition-all";
+    sidebarDiv.innerHTML = `
+      <div class="relative shrink-0">
+        <img src="${member.avatar}" alt="Avatar" class="w-7 h-7 rounded-lg object-cover border border-slate-700">
+        <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-slate-900 status-${member.status}"></span>
+      </div>
+      <div class="overflow-hidden">
+        <span class="text-xs font-medium text-slate-300 block truncate">${member.name}</span>
+        <span class="text-[10px] text-slate-500 block truncate">${member.statusText}</span>
+      </div>
+    `;
+    elements.membersListSidebar.appendChild(sidebarDiv);
+
+    // Detail panel list
+    const detailDiv = document.createElement('div');
+    detailDiv.className = "flex items-center gap-2.5 p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800";
+    detailDiv.innerHTML = `
+      <div class="relative shrink-0">
+        <img src="${member.avatar}" alt="Avatar" class="w-8 h-8 rounded-lg object-cover">
+        <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-slate-900 status-${member.status}"></span>
+      </div>
+      <div class="overflow-hidden">
+        <span class="text-xs font-semibold text-slate-800 dark:text-slate-200 block truncate">${member.name}</span>
+        <span class="text-[10px] text-slate-500 block truncate">${member.statusText}</span>
+      </div>
+    `;
+    elements.detailMembersList.appendChild(detailDiv);
+  });
+}
+
+// Render Emoji Picker
+function renderEmojiPicker() {
+  elements.emojiGrid.innerHTML = '';
+  window.AppData.emojis.forEach(emoji => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = "hover:bg-slate-100 dark:hover:bg-slate-800 p-1.5 rounded transition-all";
+    btn.textContent = emoji;
+    btn.addEventListener('click', () => {
+      elements.messageInput.value += emoji;
+      elements.emojiPicker.classList.add('hidden');
+      elements.messageInput.focus();
+    });
+    elements.emojiGrid.appendChild(btn);
+  });
+}
+
+// --- DEMO MODE SIMULATION & BOT RESPONSES ---
+function startDemoSimulation() {
+  // Periodically change bot statuses to make the workspace feel alive
+  setInterval(() => {
+    if (!state.isDemoMode) return;
+    const randomBot = state.members[Math.floor(Math.random() * state.members.length)];
+    const statuses = ['online', 'away', 'dnd'];
+    const statusTexts = ['Coding... 💻', 'Coffee break ☕', 'Reviewing PRs 🔍', 'AFK', 'In a meeting 📅'];
+    
+    randomBot.status = statuses[Math.floor(Math.random() * statuses.length)];
+    randomBot.statusText = statusTexts[Math.floor(Math.random() * statusTexts.length)];
+    renderMembers();
+  }, 15000);
+}
+
+function simulateBotResponse(userMessage) {
+  // Show typing indicator
+  setTimeout(() => {
+    elements.typingIndicator.classList.remove('hidden');
+    const randomBot = state.members[Math.floor(Math.random() * state.members.length)];
+    elements.typingText.textContent = `${randomBot.name} is typing...`;
+    
+    setTimeout(() => {
+      elements.typingIndicator.classList.add('hidden');
+      let replyText = "That sounds interesting! Tell me more about your tech stack. 🚀";
+      
+      const msgLower = userMessage.toLowerCase();
+      if (msgLower.includes('hello') || msgLower.includes('hi')) {
+        replyText = `Hey there! Welcome to CS CHAT. I am ${randomBot.name}. How is your day going?`;
+      } else if (msgLower.includes('react') || msgLower.includes('vue') || msgLower.includes('angular')) {
+        replyText = "Framework wars! Personally, I love React with Tailwind CSS. It makes building UI so fast! ⚛️";
+      } else if (msgLower.includes('firebase') || msgLower.includes('database')) {
+        replyText = "Firebase is awesome for real-time sync! Firestore makes it super easy to build chat apps like this one.";
+      } else if (msgLower.includes('design') || msgLower.includes('css')) {
+        replyText = "Good design is invisible. Tailwind CSS makes styling extremely intuitive! 🎨";
+      }
+
+      triggerBotResponse(randomBot, replyText);
+    }, 1500 + Math.random() * 1500);
+  }, 500);
+}
+
+function triggerBotResponse(bot, text) {
+  const botMsg = {
+    id: 'msg-' + Math.random().toString(36).substr(2, 9),
+    roomId: state.activeRoom,
+    senderId: bot.id || 'system',
+    senderName: bot.name || bot,
+    senderAvatar: bot.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=80&auto=format&fit=crop&q=60',
+    text: text,
+    timestamp: Date.now(),
+    reactions: {}
+  };
+
+  window.FirebaseManager.sendMessage(botMsg).then(() => {
+    if (!window.FirebaseManager.isFirebaseReady) {
+      switchRoom(state.activeRoom);
+    }
+  });
+}
+
+// Start the App
+window.addEventListener('DOMContentLoaded', initApp);
+</script></body>
+</html>
